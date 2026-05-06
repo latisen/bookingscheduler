@@ -299,14 +299,14 @@ function renderBoard() {
     const col = document.createElement("div");
     col.className = "day-col";
 
-    const head = document.createElement("div");
-    head.className = "day-header";
-    head.textContent = WEEKDAYS[day];
-    col.appendChild(head);
-
     for (const hall of state.data.halls) {
       const hallWrap = document.createElement("div");
       hallWrap.className = "hall-lane";
+
+      const dayHead = document.createElement("div");
+      dayHead.className = "day-header day-header-inline";
+      dayHead.textContent = WEEKDAYS[day];
+      hallWrap.appendChild(dayHead);
 
       const hallHead = document.createElement("div");
       hallHead.className = "hall-header";

@@ -152,6 +152,12 @@ button:hover {
   z-index: 2;
 }
 
+.day-header-inline {
+  position: static;
+  top: auto;
+  z-index: 0;
+}
+
 .hall-lane {
   border-bottom: 1px dashed #dedcd1;
 }
