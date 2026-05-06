@@ -451,8 +451,17 @@ function renderBoard() {
 
 async function removeResource(resource, id) {
   if (!confirm("Ta bort posten?")) return;
-  await api(`/api/${resource}/${id}`, { method: "DELETE" });
-  await reload();
+  if (!id) {
+    setStatus("Objektet saknar id och kan inte tas bort", true);
+    return;
+  }
+  try {
+    await api(`/api/${resource}/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await reload();
+    setStatus("Post borttagen");
+  } catch (err) {
+    setStatus(`Kunde inte ta bort posten: ${err.message}`, true);
+  }
 }
 
 async function saveResource(resource, id, payload) {

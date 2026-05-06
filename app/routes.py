@@ -49,13 +49,32 @@ NORMALIZERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
 def load_all_data() -> dict[str, Any]:
     ensure_data_files()
     return {
-        "halls": read_json("halls.json", []),
-        "clubs": read_json("clubs.json", []),
-        "groups": read_json("groups.json", []),
-        "availability_blocks": read_json("availability_blocks.json", []),
-        "combined_sessions": read_json("combined_sessions.json", []),
-        "resurfacing_rules": read_json("resurfacing_rules.json", []),
+        "halls": _load_resource_entries("halls"),
+        "clubs": _load_resource_entries("clubs"),
+        "groups": _load_resource_entries("groups"),
+        "availability_blocks": _load_resource_entries("availability_blocks"),
+        "combined_sessions": _load_resource_entries("combined_sessions"),
+        "resurfacing_rules": _load_resource_entries("resurfacing_rules"),
     }
+
+
+def _load_resource_entries(resource: str) -> list[dict[str, Any]]:
+    file_name = RESOURCE_FILES[resource]
+    entries = read_json(file_name, [])
+    normalizer = NORMALIZERS[resource]
+    changed = False
+    normalized_entries: list[dict[str, Any]] = []
+
+    for entry in entries:
+        normalized = normalizer(entry)
+        normalized_entries.append(normalized)
+        if normalized != entry:
+            changed = True
+
+    if changed:
+        write_json(file_name, normalized_entries)
+
+    return normalized_entries
 
 
 @web.route("/")
@@ -81,7 +100,7 @@ def create_resource(resource: str) -> Response:
     payload = request.get_json(silent=True) or {}
     normalizer = NORMALIZERS[resource]
     item = normalizer(payload)
-    entries = read_json(RESOURCE_FILES[resource], [])
+    entries = _load_resource_entries(resource)
     entries.append(item)
     write_json(RESOURCE_FILES[resource], entries)
     return jsonify(item), 201
@@ -96,7 +115,7 @@ def update_resource(resource: str, item_id: str) -> Response:
     normalizer = NORMALIZERS[resource]
     updated = normalizer(payload)
 
-    entries = read_json(RESOURCE_FILES[resource], [])
+    entries = _load_resource_entries(resource)
     found = False
     for idx, entry in enumerate(entries):
         if entry.get("id") == item_id:
@@ -116,7 +135,7 @@ def delete_resource(resource: str, item_id: str) -> Response:
     if resource not in RESOURCE_FILES:
         return jsonify({"error": "Okand resurs"}), 404
 
-    entries = read_json(RESOURCE_FILES[resource], [])
+    entries = _load_resource_entries(resource)
     next_entries = [entry for entry in entries if entry.get("id") != item_id]
     if len(next_entries) == len(entries):
         return jsonify({"error": "Objektet hittades inte"}), 404
