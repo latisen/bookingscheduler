@@ -59,7 +59,7 @@ class SchedulerEngine:
                 )
                 continue
 
-            candidates.sort(key=lambda c: (c["score"], c["weekday"], c["start"], c["hall_id"]))
+            candidates.sort(key=lambda c: (c["score"], c["hall_id"], c["weekday"], c["start"]))
             chosen = candidates[0]
             session = {
                 "id": f"sess_{demand.demand_id}_{len(placed)+1}",
@@ -87,11 +87,38 @@ class SchedulerEngine:
     def _build_demands(self) -> list[Demand]:
         demands: list[Demand] = []
 
+        # Räkna hur många combined-pass varje grupp ingår i,
+        # så att vi inte skapar för många individuella demands.
+        combined_count_per_group: dict[str, int] = defaultdict(int)
+        combined_demands: list[Demand] = []
+
+        for combined in self.combined:
+            group_ids = [gid for gid in combined.get("group_ids", []) if gid in self.group_by_id]
+            if not group_ids:
+                continue
+            club_ids = sorted({self.group_by_id[gid]["club_id"] for gid in group_ids})
+            n = int(combined.get("sessions_per_week", 1))
+            for gid in group_ids:
+                combined_count_per_group[gid] += n
+            for index in range(n):
+                combined_demands.append(
+                    Demand(
+                        demand_id=f"{combined['id']}_{index+1}",
+                        name=combined.get("name", "Kombinerat pass"),
+                        group_ids=group_ids,
+                        club_ids=club_ids,
+                        length=int(combined.get("session_length", 60)),
+                        source="combined",
+                    )
+                )
+
+        # Individuella demands: sessions_per_week är totalmålet inklusive combined.
+        # Skapa bara det antal individuella som återstår efter combined.
         for group in self.groups:
-            wanted = int(group.get("sessions_per_week", 0))
-            max_sessions = int(group.get("max_sessions_per_week", wanted))
-            target = min(wanted, max_sessions)
-            for index in range(target):
+            total_target = int(group.get("sessions_per_week", 0))
+            already_covered = combined_count_per_group.get(group["id"], 0)
+            individual_target = max(0, total_target - already_covered)
+            for index in range(individual_target):
                 demands.append(
                     Demand(
                         demand_id=f"{group['id']}_{index+1}",
@@ -103,23 +130,8 @@ class SchedulerEngine:
                     )
                 )
 
-        for combined in self.combined:
-            group_ids = [gid for gid in combined.get("group_ids", []) if gid in self.group_by_id]
-            if not group_ids:
-                continue
-            club_ids = sorted({self.group_by_id[gid]["club_id"] for gid in group_ids})
-            for index in range(int(combined.get("sessions_per_week", 1))):
-                demands.append(
-                    Demand(
-                        demand_id=f"{combined['id']}_{index+1}",
-                        name=combined.get("name", "Kombinerat pass"),
-                        group_ids=group_ids,
-                        club_ids=club_ids,
-                        length=int(combined.get("session_length", 60)),
-                        source="combined",
-                    )
-                )
-        return demands
+        # Combined-demands sorteras in FÖRE individuella så de placeras med rätt hall-alternativ.
+        return combined_demands + demands
 
     def _demand_sort_key(self, demand: Demand) -> tuple:
         strictness = 0
@@ -205,8 +217,14 @@ class SchedulerEngine:
         for group_id in session["group_ids"]:
             group = self.group_by_id[group_id]
             group_sessions = self.sessions_per_group[group_id]
-            if len(group_sessions) >= int(group.get("max_sessions_per_week", group.get("sessions_per_week", 0))):
+            # sessions_per_week är totalmålet; max_sessions_per_week är det absoluta taket.
+            total_target = int(group.get("sessions_per_week", 0))
+            hard_max = int(group.get("max_sessions_per_week", total_target))
+            if len(group_sessions) >= hard_max:
                 reasons.append(f"Gruppen {group['name']} har redan max antal pass")
+                return False, reasons
+            if len(group_sessions) >= total_target:
+                reasons.append(f"Gruppen {group['name']} har natt malantalpass per vecka")
                 return False, reasons
 
             if group.get("no_two_same_day"):
@@ -338,10 +356,25 @@ class SchedulerEngine:
 
         for group_id in session["group_ids"]:
             group = self.group_by_id[group_id]
+            prior_sessions = self.sessions_per_group[group_id]
+            prior_days = [s["weekday"] for s in prior_sessions]
+
+            # Starkt straff om gruppen redan har pass denna dag
+            if weekday in prior_days:
+                score += 30
+
+            # Premiär dagar med minst befintliga pass i hallen (sprid ut)
+            hall_day_count = sum(
+                1 for s in prior_sessions if s["weekday"] == weekday and s["hall_id"] == session["hall_id"]
+            )
+            score += hall_day_count * 10
+
+            # Önskade dagar
             preferred_days = group.get("preferred_days", [])
             if preferred_days and weekday not in preferred_days:
-                score += 6
+                score += 8
 
+            # Önskad tidspann
             pref_range = group.get("preferred_time_range")
             priority = max(1, int(group.get("time_preference_priority", 1)))
             if pref_range and len(pref_range) == 2:
@@ -352,18 +385,19 @@ class SchedulerEngine:
                 elif start > pref_end:
                     score += ((start - pref_end) // 10) * priority
 
-            prior_days = sorted({s["weekday"] for s in self.sessions_per_group[group_id]})
+            # Undvik dagar i rad
             if group.get("avoid_consecutive_days") and any(abs(weekday - d) == 1 for d in prior_days):
-                score += 8
+                score += 12
 
+            # Åldersanpassning
             if group.get("age_level") == "youth" and start >= 20 * 60:
-                score += 6
+                score += 8
             if group.get("age_level") in {"senior", "adult"} and start < 17 * 60:
-                score += 3
+                score += 4
 
-            hall_usage = [s for s in self.sessions_per_group[group_id] if s["hall_id"] == session["hall_id"]]
-            if len(hall_usage) >= 2:
-                score += 2
+            # Hallspridning: undvik för hög koncentration i en hall
+            hall_usage = sum(1 for s in prior_sessions if s["hall_id"] == session["hall_id"])
+            score += hall_usage * 3
 
         return score
 
