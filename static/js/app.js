@@ -82,11 +82,21 @@ function bindList(listId, items, labelFn, onEdit, onDelete) {
     left.textContent = labelFn(item);
     const actions = document.createElement("div");
     const editBtn = document.createElement("button");
+    editBtn.type = "button";
     editBtn.textContent = "Redigera";
-    editBtn.addEventListener("click", () => onEdit(item));
+    editBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onEdit(item);
+    });
     const delBtn = document.createElement("button");
+    delBtn.type = "button";
     delBtn.textContent = "Ta bort";
-    delBtn.addEventListener("click", () => onDelete(item.id));
+    delBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onDelete(item.id);
+    });
     actions.appendChild(editBtn);
     actions.appendChild(delBtn);
     li.appendChild(left);
