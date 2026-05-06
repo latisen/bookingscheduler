@@ -15,7 +15,9 @@ class Demand:
     name: str
     group_ids: list[str]
     club_ids: list[str]
-    length: int
+    min_length: int
+    max_length: int
+    preferred_length: int
     source: str
 
 
@@ -118,7 +120,9 @@ class SchedulerEngine:
                         name=combined.get("name", "Kombinerat pass"),
                         group_ids=group_ids,
                         club_ids=[club_id],
-                        length=int(combined.get("session_length", 60)),
+                        min_length=int(combined.get("min_session_length", combined.get("session_length", 60))),
+                        max_length=int(combined.get("max_session_length", combined.get("session_length", 60))),
+                        preferred_length=int(combined.get("max_session_length", combined.get("session_length", 60))),
                         source="combined",
                     )
                 )
@@ -136,7 +140,9 @@ class SchedulerEngine:
                         name=group["name"],
                         group_ids=[group["id"]],
                         club_ids=[group["club_id"]],
-                        length=int(group.get("session_length", 60)),
+                        min_length=int(group.get("min_session_length", group.get("session_length", 60))),
+                        max_length=int(group.get("max_session_length", group.get("session_length", 60))),
+                        preferred_length=int(group.get("max_session_length", group.get("session_length", 60))),
                         source="group",
                     )
                 )
@@ -153,7 +159,7 @@ class SchedulerEngine:
             if group.get("strict_hall_id"):
                 strictness += 1
             hall_options = min(hall_options, self._count_hall_options(group))
-        return (-strictness, hall_options, -demand.length, demand.name, demand.demand_id)
+        return (-strictness, hall_options, -demand.max_length, demand.name, demand.demand_id)
 
     def _count_hall_options(self, group: dict[str, Any]) -> int:
         halls = [h["id"] for h in self.halls]
@@ -177,27 +183,38 @@ class SchedulerEngine:
             weekday = int(block["weekday"])
             start_min = time_to_minutes(block["start"])
             end_min = time_to_minutes(block["end"])
-            if end_min - start_min < demand.length:
+            min_len = max(TIME_STEP, int(demand.min_length))
+            max_len = int(demand.max_length)
+            if min_len > max_len:
+                min_len, max_len = max_len, min_len
+            if end_min - start_min < min_len:
                 continue
-            for slot_start in range(start_min, end_min - demand.length + 1, TIME_STEP):
-                session = {
-                    "id": "candidate",
-                    "name": demand.name,
-                    "source": demand.source,
-                    "group_ids": demand.group_ids,
-                    "club_id": club_id,
-                    "hall_id": hall_id,
-                    "weekday": weekday,
-                    "start": slot_start,
-                    "end": slot_start + demand.length,
-                    "manual_exception": False,
-                }
-                ok, reasons = self._passes_hard_rules(session, placed)
-                if not ok:
-                    self.reasons_per_demand[demand.demand_id].extend(reasons)
+            for slot_start in range(start_min, end_min - min_len + 1, TIME_STEP):
+                max_possible = min(max_len, end_min - slot_start)
+                if max_possible < min_len:
                     continue
-                score = self._soft_score(session)
-                candidates.append({**session, "score": score})
+
+                # Langre pass provas forst i samma slot. Soft score avgor slutvalet.
+                length_options = range(max_possible, min_len - 1, -TIME_STEP)
+                for session_length in length_options:
+                    session = {
+                        "id": "candidate",
+                        "name": demand.name,
+                        "source": demand.source,
+                        "group_ids": demand.group_ids,
+                        "club_id": club_id,
+                        "hall_id": hall_id,
+                        "weekday": weekday,
+                        "start": slot_start,
+                        "end": slot_start + session_length,
+                        "manual_exception": False,
+                    }
+                    ok, reasons = self._passes_hard_rules(session, placed)
+                    if not ok:
+                        self.reasons_per_demand[demand.demand_id].extend(reasons)
+                        continue
+                    score = self._soft_score(session, demand, start_min, end_min)
+                    candidates.append({**session, "score": score})
 
         return candidates
 
@@ -368,10 +385,26 @@ class SchedulerEngine:
                 return True
         return False
 
-    def _soft_score(self, session: dict[str, Any]) -> int:
+    def _soft_score(self, session: dict[str, Any], demand: Demand | None = None, block_start: int | None = None, block_end: int | None = None) -> int:
         score = 0
         start = session["start"]
         weekday = session["weekday"]
+        length = session["end"] - session["start"]
+
+        # Globalt mal: fa plats med sa manga pass som mojligt.
+        # Kortare pass far en liten bonus inom tillatet intervall.
+        score += length // 10
+
+        # Samtidigt vill vi utnyttja blocken effektivt.
+        if block_start is not None and block_end is not None:
+            left_gap = max(0, start - block_start)
+            right_gap = max(0, block_end - session["end"])
+            smallest_gap = min(left_gap, right_gap)
+            score += smallest_gap // 10
+
+        if demand is not None:
+            preferred_length = int(demand.preferred_length)
+            score += abs(preferred_length - length) // 10
 
         for group_id in session["group_ids"]:
             group = self.group_by_id[group_id]

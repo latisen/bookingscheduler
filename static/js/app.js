@@ -178,13 +178,18 @@ function renderEntities() {
   bindList(
     "groupList",
     state.data.groups,
-    (g) => `${g.name} (${g.sessions_per_week} pass/vecka)`,
+    (g) => {
+      const minLen = g.min_session_length ?? g.session_length ?? 60;
+      const maxLen = g.max_session_length ?? g.session_length ?? 60;
+      return `${g.name} (${g.sessions_per_week} pass/vecka, ${minLen}-${maxLen} min)`;
+    },
     (g) => {
       $("groupId").value = g.id;
       $("groupName").value = g.name;
       $("groupClub").value = g.club_id;
       $("groupSessionsPerWeek").value = g.sessions_per_week;
-      $("groupSessionLength").value = g.session_length;
+      $("groupMinSessionLength").value = g.min_session_length ?? g.session_length ?? 60;
+      $("groupMaxSessionLength").value = g.max_session_length ?? g.session_length ?? 60;
       $("groupTimePriority").value = g.time_preference_priority;
       $("groupMaxPerWeek").value = g.max_sessions_per_week;
       $("groupMinRest").value = g.min_rest_hours;
@@ -212,12 +217,17 @@ function renderEntities() {
   bindList(
     "combinedList",
     state.data.combined_sessions,
-    (c) => `${c.name} (${c.sessions_per_week} pass)` ,
+    (c) => {
+      const minLen = c.min_session_length ?? c.session_length ?? 60;
+      const maxLen = c.max_session_length ?? c.session_length ?? 60;
+      return `${c.name} (${c.sessions_per_week} pass, ${minLen}-${maxLen} min)`;
+    },
     (c) => {
       $("combinedId").value = c.id;
       $("combinedName").value = c.name;
       $("combinedSessionsPerWeek").value = c.sessions_per_week;
-      $("combinedSessionLength").value = c.session_length;
+      $("combinedMinSessionLength").value = c.min_session_length ?? c.session_length ?? 60;
+      $("combinedMaxSessionLength").value = c.max_session_length ?? c.session_length ?? 60;
       [...$("combinedGroups").options].forEach((opt) => {
         opt.selected = (c.group_ids || []).includes(opt.value);
       });
@@ -546,11 +556,17 @@ function bindForms() {
     e.preventDefault();
     const prefStart = $("groupPrefStart").value;
     const prefEnd = $("groupPrefEnd").value;
+    const minLength = Number($("groupMinSessionLength").value);
+    const maxLength = Number($("groupMaxSessionLength").value);
+    const finalMin = Math.min(minLength, maxLength);
+    const finalMax = Math.max(minLength, maxLength);
     await saveResource("groups", $("groupId").value, {
       name: $("groupName").value,
       club_id: $("groupClub").value,
       sessions_per_week: Number($("groupSessionsPerWeek").value),
-      session_length: Number($("groupSessionLength").value),
+      min_session_length: finalMin,
+      max_session_length: finalMax,
+      session_length: finalMax,
       allowed_halls: selectedValues("groupAllowedHalls"),
       forbidden_halls: selectedValues("groupForbiddenHalls"),
       strict_hall_id: $("groupStrictHall").value || null,
@@ -568,11 +584,17 @@ function bindForms() {
 
   $("combinedForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const minLength = Number($("combinedMinSessionLength").value);
+    const maxLength = Number($("combinedMaxSessionLength").value);
+    const finalMin = Math.min(minLength, maxLength);
+    const finalMax = Math.max(minLength, maxLength);
     await saveResource("combined_sessions", $("combinedId").value, {
       name: $("combinedName").value,
       group_ids: selectedValues("combinedGroups"),
       sessions_per_week: Number($("combinedSessionsPerWeek").value),
-      session_length: Number($("combinedSessionLength").value),
+      min_session_length: finalMin,
+      max_session_length: finalMax,
+      session_length: finalMax,
     });
   });
 

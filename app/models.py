@@ -28,7 +28,13 @@ def normalize_group(payload: dict[str, Any]) -> dict[str, Any]:
     data["name"] = data.get("name", "").strip()
     data["club_id"] = data.get("club_id", "")
     data["sessions_per_week"] = int(data.get("sessions_per_week", 1))
-    data["session_length"] = int(data.get("session_length", 60))
+    fallback_length = int(data.get("session_length", 60))
+    data["min_session_length"] = int(data.get("min_session_length", fallback_length))
+    data["max_session_length"] = int(data.get("max_session_length", fallback_length))
+    if data["min_session_length"] > data["max_session_length"]:
+        data["min_session_length"], data["max_session_length"] = data["max_session_length"], data["min_session_length"]
+    # Behall session_length for bakatkompatibilitet med existerande data/exporter.
+    data["session_length"] = data["max_session_length"]
     data["allowed_halls"] = data.get("allowed_halls", [])
     data["forbidden_halls"] = data.get("forbidden_halls", [])
     data["strict_hall_id"] = data.get("strict_hall_id")
@@ -61,7 +67,12 @@ def normalize_combined(payload: dict[str, Any]) -> dict[str, Any]:
     data["name"] = data.get("name", "Kombinerat pass")
     data["group_ids"] = data.get("group_ids", [])
     data["sessions_per_week"] = int(data.get("sessions_per_week", 1))
-    data["session_length"] = int(data.get("session_length", 60))
+    fallback_length = int(data.get("session_length", 60))
+    data["min_session_length"] = int(data.get("min_session_length", fallback_length))
+    data["max_session_length"] = int(data.get("max_session_length", fallback_length))
+    if data["min_session_length"] > data["max_session_length"]:
+        data["min_session_length"], data["max_session_length"] = data["max_session_length"], data["min_session_length"]
+    data["session_length"] = data["max_session_length"]
     return data
 
 

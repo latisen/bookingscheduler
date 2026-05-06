@@ -88,8 +88,10 @@
             <select id="groupClub" required></select>
             <label>Pass/vecka</label>
             <input id="groupSessionsPerWeek" type="number" min="1" value="2" />
-            <label>Passlängd (min)</label>
-            <input id="groupSessionLength" type="number" min="30" step="5" value="60" />
+            <label>Min passlängd (min)</label>
+            <input id="groupMinSessionLength" type="number" min="30" step="5" value="45" />
+            <label>Max passlängd (min)</label>
+            <input id="groupMaxSessionLength" type="number" min="30" step="5" value="60" />
             <label>Tillåtna hallar</label>
             <select id="groupAllowedHalls" multiple></select>
             <label>Förbjudna hallar</label>
@@ -139,8 +141,10 @@
             <select id="combinedGroups" multiple required></select>
             <label>Pass/vecka</label>
             <input id="combinedSessionsPerWeek" type="number" min="1" value="1" />
-            <label>Passlängd (min)</label>
-            <input id="combinedSessionLength" type="number" min="30" step="5" value="60" />
+            <label>Min passlängd (min)</label>
+            <input id="combinedMinSessionLength" type="number" min="30" step="5" value="45" />
+            <label>Max passlängd (min)</label>
+            <input id="combinedMaxSessionLength" type="number" min="30" step="5" value="60" />
             <div class="row-actions">
               <button type="submit">Spara kombinerat</button>
               <button type="button" id="combinedReset">Ny</button>
