@@ -486,9 +486,9 @@ class SchedulerEngine:
         # Samtidigt vill vi utnyttja blocken effektivt.
         if block_start is not None and block_end is not None:
             left_gap = max(0, start - block_start)
-            right_gap = max(0, block_end - session["end"])
-            smallest_gap = min(left_gap, right_gap)
-            score += smallest_gap // 10
+            # Packa alltid uppifran och ner: tidig start far stark prioritet.
+            # Da hamnar overbliven tid i slutet av blocket.
+            score += (left_gap // 10) * 25
 
         if demand is not None:
             preferred_length = int(demand.preferred_length)
