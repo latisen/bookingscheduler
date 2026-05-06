@@ -1,0 +1,23 @@
+[
+  {
+    "id": "combined_u18_u20",
+    "name": "U18/U20",
+    "group_ids": ["group_u18", "group_u20"],
+    "sessions_per_week": 1,
+    "session_length": 90
+  },
+  {
+    "id": "combined_u15_u16",
+    "name": "U15/U16",
+    "group_ids": ["group_u15", "group_u16"],
+    "sessions_per_week": 1,
+    "session_length": 75
+  },
+  {
+    "id": "combined_u13_u14",
+    "name": "U13/U14",
+    "group_ids": ["group_u13", "group_u14"],
+    "sessions_per_week": 1,
+    "session_length": 60
+  }
+]

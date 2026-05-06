@@ -1,0 +1,98 @@
+[
+  {
+    "id": "block_h1_mon_1",
+    "club_id": "club_hockey",
+    "hall_id": "hall_tyrshov",
+    "weekday": 0,
+    "start": "16:00",
+    "end": "22:00"
+  },
+  {
+    "id": "block_h1_tue_1",
+    "club_id": "club_hockey",
+    "hall_id": "hall_tyrshov",
+    "weekday": 1,
+    "start": "16:00",
+    "end": "22:00"
+  },
+  {
+    "id": "block_h1_wed_1",
+    "club_id": "club_hockey",
+    "hall_id": "hall_tyrshov",
+    "weekday": 2,
+    "start": "16:00",
+    "end": "22:00"
+  },
+  {
+    "id": "block_h1_thu_1",
+    "club_id": "club_hockey",
+    "hall_id": "hall_tyrshov",
+    "weekday": 3,
+    "start": "16:00",
+    "end": "22:00"
+  },
+  {
+    "id": "block_h1_fri_1",
+    "club_id": "club_hockey",
+    "hall_id": "hall_tyrshov",
+    "weekday": 4,
+    "start": "16:00",
+    "end": "21:00"
+  },
+  {
+    "id": "block_h2_mon_1",
+    "club_id": "club_hockey",
+    "hall_id": "hall_osteras",
+    "weekday": 0,
+    "start": "17:00",
+    "end": "21:00"
+  },
+  {
+    "id": "block_h2_wed_1",
+    "club_id": "club_hockey",
+    "hall_id": "hall_osteras",
+    "weekday": 2,
+    "start": "17:00",
+    "end": "21:00"
+  },
+  {
+    "id": "block_h2_fri_1",
+    "club_id": "club_hockey",
+    "hall_id": "hall_osteras",
+    "weekday": 4,
+    "start": "17:00",
+    "end": "21:00"
+  },
+  {
+    "id": "block_ks_mon_1",
+    "club_id": "club_ks",
+    "hall_id": "hall_osteras",
+    "weekday": 0,
+    "start": "15:00",
+    "end": "20:00"
+  },
+  {
+    "id": "block_ks_tue_1",
+    "club_id": "club_ks",
+    "hall_id": "hall_osteras",
+    "weekday": 1,
+    "start": "15:00",
+    "end": "20:00"
+  },
+  {
+    "id": "block_ks_thu_1",
+    "club_id": "club_ks",
+    "hall_id": "hall_osteras",
+    "weekday": 3,
+    "start": "15:00",
+    "end": "20:00"
+  },
+  {
+    "id": "block_ks_fri_1",
+    "club_id": "club_ks",
+    "hall_id": "hall_osteras",
+    "weekday": 4,
+    "start": "15:00",
+    "end": "20:00"
+  }
+]

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Istidsplanerare</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Istidsplanerare</h1>
+      <div class="top-actions">
+        <button id="generateScheduleBtn">Generera schema</button>
+        <button id="saveScheduleBtn">Spara schema</button>
+        <button id="loadScheduleBtn">Ladda schema</button>
+        <button id="resetSeedBtn">Återställ seed</button>
+        <select id="exportFormat">
+          <option value="json">Export JSON</option>
+          <option value="csv">Export CSV</option>
+          <option value="pdf">Export PDF</option>
+          <option value="png">Export PNG</option>
+        </select>
+        <button id="exportBtn">Exportera</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>Hallar</h2>
+          <form id="hallForm">
+            <input type="hidden" id="hallId" />
+            <label>Namn</label>
+            <input id="hallName" required />
+            <div class="row-actions">
+              <button type="submit">Spara hall</button>
+              <button type="button" id="hallReset">Ny</button>
+            </div>
+          </form>
+          <ul id="hallList" class="entity-list"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>Föreningar</h2>
+          <form id="clubForm">
+            <input type="hidden" id="clubId" />
+            <label>Namn</label>
+            <input id="clubName" required />
+            <label>Färg</label>
+            <input id="clubColor" type="color" value="#bda8d8" />
+            <div class="row-actions">
+              <button type="submit">Spara förening</button>
+              <button type="button" id="clubReset">Ny</button>
+            </div>
+          </form>
+          <ul id="clubList" class="entity-list"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>Tidsblock</h2>
+          <form id="blockForm">
+            <input type="hidden" id="blockId" />
+            <label>Förening</label>
+            <select id="blockClub" required></select>
+            <label>Hall</label>
+            <select id="blockHall" required></select>
+            <label>Veckodag</label>
+            <select id="blockWeekday"></select>
+            <label>Start</label>
+            <input id="blockStart" type="time" required />
+            <label>Slut</label>
+            <input id="blockEnd" type="time" required />
+            <div class="row-actions">
+              <button type="submit">Spara block</button>
+              <button type="button" id="blockReset">Ny</button>
+            </div>
+          </form>
+          <ul id="blockList" class="entity-list"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>Grupper</h2>
+          <form id="groupForm">
+            <input type="hidden" id="groupId" />
+            <label>Namn</label>
+            <input id="groupName" required />
+            <label>Förening</label>
+            <select id="groupClub" required></select>
+            <label>Pass/vecka</label>
+            <input id="groupSessionsPerWeek" type="number" min="1" value="2" />
+            <label>Passlängd (min)</label>
+            <input id="groupSessionLength" type="number" min="30" step="5" value="60" />
+            <label>Tillåtna hallar</label>
+            <select id="groupAllowedHalls" multiple></select>
+            <label>Förbjudna hallar</label>
+            <select id="groupForbiddenHalls" multiple></select>
+            <label>Endast hall (valfritt)</label>
+            <select id="groupStrictHall"><option value="">Ingen</option></select>
+            <label>Önskade dagar</label>
+            <select id="groupPreferredDays" multiple></select>
+            <label>Önskad tid från</label>
+            <input id="groupPrefStart" type="time" />
+            <label>Önskad tid till</label>
+            <input id="groupPrefEnd" type="time" />
+            <label>Prioritet tidsönskemål</label>
+            <input id="groupTimePriority" type="number" min="1" max="5" value="2" />
+            <label>Max pass/vecka</label>
+            <input id="groupMaxPerWeek" type="number" min="1" value="2" />
+            <label>Min vila (timmar)</label>
+            <input id="groupMinRest" type="number" min="0" value="6" />
+            <label>Disciplin</label>
+            <select id="groupDiscipline">
+              <option value="hockey">Hockey</option>
+              <option value="figure">Konståkning</option>
+            </select>
+            <label>Åldersnivå</label>
+            <select id="groupAgeLevel">
+              <option value="youth">Yngre</option>
+              <option value="senior">Senior</option>
+              <option value="adult">Vuxen</option>
+            </select>
+            <label><input id="groupNoTwoSameDay" type="checkbox" checked /> Inga två pass samma dag</label>
+            <label><input id="groupAvoidConsecutive" type="checkbox" /> Undvik dagar i rad</label>
+            <div class="row-actions">
+              <button type="submit">Spara grupp</button>
+              <button type="button" id="groupReset">Ny</button>
+            </div>
+          </form>
+          <ul id="groupList" class="entity-list"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>Kombinerade pass</h2>
+          <form id="combinedForm">
+            <input type="hidden" id="combinedId" />
+            <label>Namn</label>
+            <input id="combinedName" required />
+            <label>Grupper</label>
+            <select id="combinedGroups" multiple required></select>
+            <label>Pass/vecka</label>
+            <input id="combinedSessionsPerWeek" type="number" min="1" value="1" />
+            <label>Passlängd (min)</label>
+            <input id="combinedSessionLength" type="number" min="30" step="5" value="60" />
+            <div class="row-actions">
+              <button type="submit">Spara kombinerat</button>
+              <button type="button" id="combinedReset">Ny</button>
+            </div>
+          </form>
+          <ul id="combinedList" class="entity-list"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>Spolningsregler</h2>
+          <form id="ruleForm">
+            <input type="hidden" id="ruleId" />
+            <label>Namn</label>
+            <input id="ruleName" required />
+            <label>Scope</label>
+            <select id="ruleScope">
+              <option value="hall">Hall</option>
+              <option value="club">Förening</option>
+            </select>
+            <label>Hall</label>
+            <select id="ruleHall"><option value="">Alla</option></select>
+            <label>Förening</label>
+            <select id="ruleClub"><option value="">Alla</option></select>
+            <label>Typ</label>
+            <select id="ruleType">
+              <option value="between_all_sessions">Buffer mellan pass</option>
+              <option value="max_in_row">Max i rad</option>
+            </select>
+            <label>Buffer (min)</label>
+            <input id="ruleBuffer" type="number" min="0" value="10" />
+            <label>Max i rad</label>
+            <input id="ruleMaxInRow" type="number" min="1" value="2" />
+            <label>Disciplin</label>
+            <select id="ruleDiscipline">
+              <option value="hockey">Hockey</option>
+              <option value="figure">Konståkning</option>
+            </select>
+            <label>Blockerade veckodagar</label>
+            <select id="ruleBlockedDays" multiple></select>
+            <div class="row-actions">
+              <button type="submit">Spara regel</button>
+              <button type="button" id="ruleReset">Ny</button>
+            </div>
+          </form>
+          <ul id="ruleList" class="entity-list"></ul>
+        </section>
+      </aside>
+
+      <section class="main-view">
+        <div class="status-box" id="statusBox">Laddar...</div>
+        <div id="weeklyBoard" class="weekly-board"></div>
+
+        <div class="bottom-grid">
+          <section class="panel small">
+            <h3>Ej placerade pass</h3>
+            <ul id="unscheduledList"></ul>
+          </section>
+          <section class="panel small">
+            <h3>Konflikter</h3>
+            <ul id="conflictList"></ul>
+          </section>
+          <section class="panel small">
+            <h3>Outnyttjad tid (min)</h3>
+            <ul id="idleList"></ul>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

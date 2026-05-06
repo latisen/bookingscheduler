@@ -1,0 +1,38 @@
+[
+  {
+    "id": "rule_hockey_between",
+    "name": "10 min mellan hockeypass",
+    "scope": "club",
+    "club_id": "club_hockey",
+    "hall_id": null,
+    "rule_type": "between_all_sessions",
+    "buffer_minutes": 10,
+    "max_in_row": 2,
+    "discipline": "hockey",
+    "blocked_weekdays": []
+  },
+  {
+    "id": "rule_figure_max_two",
+    "name": "Max 2 konståkning i rad",
+    "scope": "hall",
+    "club_id": null,
+    "hall_id": "hall_osteras",
+    "rule_type": "max_in_row",
+    "buffer_minutes": 10,
+    "max_in_row": 2,
+    "discipline": "figure",
+    "blocked_weekdays": []
+  },
+  {
+    "id": "rule_sunday_no_resurfacing",
+    "name": "Sondag ingen spolning",
+    "scope": "hall",
+    "club_id": null,
+    "hall_id": "hall_tyrshov",
+    "rule_type": "between_all_sessions",
+    "buffer_minutes": 10,
+    "max_in_row": 2,
+    "discipline": "hockey",
+    "blocked_weekdays": [6]
+  }
+]
