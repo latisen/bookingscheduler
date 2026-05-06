@@ -364,6 +364,32 @@ function renderBoard() {
         }
       });
 
+      const availabilityBlocks = (state.data.availability_blocks || []).filter(
+        (b) => Number(b.weekday) === day && b.hall_id === hall.id
+      );
+      for (const block of availabilityBlocks) {
+        const blockStart = timeToMinutes(block.start);
+        const blockEnd = timeToMinutes(block.end);
+        const top = (blockStart - DAY_START) * PIXELS_PER_MIN;
+        const height = Math.max(10, (blockEnd - blockStart) * PIXELS_PER_MIN);
+        if (height <= 0) continue;
+
+        const club = state.data.clubs.find((c) => c.id === block.club_id);
+        const outline = document.createElement("div");
+        outline.className = "availability-outline";
+        outline.style.top = `${top}px`;
+        outline.style.height = `${height}px`;
+        outline.style.color = club?.color || "#7a7a7a";
+        outline.style.background = club?.color || "#d0d0d0";
+
+        const label = document.createElement("span");
+        label.className = "availability-label";
+        label.textContent = `${club?.name || block.club_id} ${block.start}-${block.end}`;
+        outline.appendChild(label);
+
+        timeline.appendChild(outline);
+      }
+
       const sessions = (state.schedule.sessions || []).filter(
         (s) => Number(s.weekday) === day && s.hall_id === hall.id
       );
