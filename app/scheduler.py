@@ -86,33 +86,44 @@ class SchedulerEngine:
 
     def _build_demands(self) -> list[Demand]:
         demands: list[Demand] = []
-
-        # Räkna hur många combined-pass varje grupp ingår i,
-        # så att vi inte skapar för många individuella demands.
-        combined_count_per_group: dict[str, int] = defaultdict(int)
         combined_demands: list[Demand] = []
+
+        # Räkna hur många combined-pass varje grupp täcks av,
+        # så att vi vet hur många individuella demands som återstår.
+        combined_count_per_group: dict[str, int] = defaultdict(int)
 
         for combined in self.combined:
             group_ids = [gid for gid in combined.get("group_ids", []) if gid in self.group_by_id]
             if not group_ids:
                 continue
-            club_ids = sorted({self.group_by_id[gid]["club_id"] for gid in group_ids})
+
+            # Grupper från olika klubbar kan aldrig ha gemensamma pass.
+            club_ids = {self.group_by_id[gid]["club_id"] for gid in group_ids}
+            if len(club_ids) > 1:
+                # Hoppa över och rapportera som ej placerat vid generering
+                self.reasons_per_demand[combined["id"]] = [
+                    "Kombinerade pass kan bara skapas inom samma förening"
+                ]
+                continue
+
+            club_id = next(iter(club_ids))
             n = int(combined.get("sessions_per_week", 1))
             for gid in group_ids:
                 combined_count_per_group[gid] += n
+
             for index in range(n):
                 combined_demands.append(
                     Demand(
                         demand_id=f"{combined['id']}_{index+1}",
                         name=combined.get("name", "Kombinerat pass"),
                         group_ids=group_ids,
-                        club_ids=club_ids,
+                        club_ids=[club_id],
                         length=int(combined.get("session_length", 60)),
                         source="combined",
                     )
                 )
 
-        # Individuella demands: sessions_per_week är totalmålet inklusive combined.
+        # Individuella demands: sessions_per_week är totalmålet inklusive combined-pass.
         # Skapa bara det antal individuella som återstår efter combined.
         for group in self.groups:
             total_target = int(group.get("sessions_per_week", 0))
@@ -130,7 +141,8 @@ class SchedulerEngine:
                     )
                 )
 
-        # Combined-demands sorteras in FÖRE individuella så de placeras med rätt hall-alternativ.
+        # Combined placeras först — de har fler hallrestriktioner och måste säkras före
+        # de individuella passen delas ut.
         return combined_demands + demands
 
     def _demand_sort_key(self, demand: Demand) -> tuple:
@@ -150,13 +162,19 @@ class SchedulerEngine:
     def _candidate_slots(self, demand: Demand, placed: list[dict[str, Any]]) -> list[dict[str, Any]]:
         candidates: list[dict[str, Any]] = []
 
+        # Alla combined-pass är alltid inom en och samma förening, så club_ids har exakt ett element.
+        club_id = demand.club_ids[0]
+
         candidate_blocks = [
             block
             for block in self.blocks
-            if block.get("club_id") in demand.club_ids and self._demand_fits_hall(block.get("hall_id"), demand)
+            if block.get("club_id") == club_id
+            and self._demand_fits_hall(block.get("hall_id"), demand)
         ]
 
         for block in sorted(candidate_blocks, key=lambda b: (b["weekday"], b["hall_id"], b["start"])):
+            hall_id = block["hall_id"]
+            weekday = int(block["weekday"])
             start_min = time_to_minutes(block["start"])
             end_min = time_to_minutes(block["end"])
             if end_min - start_min < demand.length:
@@ -167,9 +185,9 @@ class SchedulerEngine:
                     "name": demand.name,
                     "source": demand.source,
                     "group_ids": demand.group_ids,
-                    "club_id": block["club_id"],
-                    "hall_id": block["hall_id"],
-                    "weekday": int(block["weekday"]),
+                    "club_id": club_id,
+                    "hall_id": hall_id,
+                    "weekday": weekday,
                     "start": slot_start,
                     "end": slot_start + demand.length,
                     "manual_exception": False,
@@ -217,14 +235,15 @@ class SchedulerEngine:
         for group_id in session["group_ids"]:
             group = self.group_by_id[group_id]
             group_sessions = self.sessions_per_group[group_id]
-            # sessions_per_week är totalmålet; max_sessions_per_week är det absoluta taket.
             total_target = int(group.get("sessions_per_week", 0))
-            hard_max = int(group.get("max_sessions_per_week", total_target))
+            # max_sessions_per_week är ett absolut tak men får aldrig vara lägre än målet
+            # (skyddar mot att gammal sparad data blockerar när sessions_per_week höjs)
+            hard_max = max(total_target, int(group.get("max_sessions_per_week", total_target)))
             if len(group_sessions) >= hard_max:
-                reasons.append(f"Gruppen {group['name']} har redan max antal pass")
+                reasons.append(f"Gruppen {group['name']} har redan max antal pass ({hard_max})")
                 return False, reasons
             if len(group_sessions) >= total_target:
-                reasons.append(f"Gruppen {group['name']} har natt malantalpass per vecka")
+                reasons.append(f"Gruppen {group['name']} har natt malantalpass per vecka ({total_target})")
                 return False, reasons
 
             if group.get("no_two_same_day"):
