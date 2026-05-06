@@ -45,39 +45,41 @@ class SchedulerEngine:
         demands = sorted(demands, key=self._demand_sort_key)
 
         placed: list[dict[str, Any]] = []
-        unscheduled: list[dict[str, Any]] = []
+        unscheduled_demands: list[Demand] = []
 
         for demand in demands:
             candidates = self._candidate_slots(demand, placed)
             if not candidates:
-                reasons = self.reasons_per_demand.get(demand.demand_id, ["Ingen giltig lucka hittades"])
-                unscheduled.append(
-                    {
-                        "demand_id": demand.demand_id,
-                        "name": demand.name,
-                        "group_ids": demand.group_ids,
-                        "reasons": sorted(set(reasons)),
-                    }
-                )
+                unscheduled_demands.append(demand)
                 continue
 
-            candidates.sort(key=lambda c: (c["score"], c["hall_id"], c["weekday"], c["start"]))
-            chosen = candidates[0]
-            session = {
-                "id": f"sess_{demand.demand_id}_{len(placed)+1}",
-                "name": demand.name,
-                "source": demand.source,
-                "group_ids": demand.group_ids,
-                "club_id": chosen["club_id"],
-                "hall_id": chosen["hall_id"],
-                "weekday": chosen["weekday"],
-                "start": chosen["start"],
-                "end": chosen["end"],
-                "manual_exception": False,
-            }
-            placed.append(session)
-            for group_id in demand.group_ids:
-                self.sessions_per_group[group_id].append(session)
+            placed.append(self._materialize_session(demand, self._best_candidate(candidates), len(placed) + 1))
+            self._rebuild_sessions_per_group(placed)
+
+        # Reparationsfas: forsok placera oplacerade demands genom att flytta exakt ett redan
+        # placerat pass till annan tillaten lucka. Detta loser vanliga greedy-lokala optimum.
+        improved = True
+        while improved:
+            improved = False
+            next_unscheduled: list[Demand] = []
+            for demand in unscheduled_demands:
+                if self._try_place_with_one_relocation(demand, placed):
+                    improved = True
+                    continue
+                next_unscheduled.append(demand)
+            unscheduled_demands = next_unscheduled
+
+        unscheduled: list[dict[str, Any]] = []
+        for demand in unscheduled_demands:
+            reasons = self.reasons_per_demand.get(demand.demand_id, ["Ingen giltig lucka hittades"])
+            unscheduled.append(
+                {
+                    "demand_id": demand.demand_id,
+                    "name": demand.name,
+                    "group_ids": demand.group_ids,
+                    "reasons": sorted(set(reasons)),
+                }
+            )
 
         conflicts = self.evaluate_schedule(placed)
         return {
@@ -85,6 +87,92 @@ class SchedulerEngine:
             "unscheduled": unscheduled,
             "conflicts": conflicts,
         }
+
+    def _best_candidate(self, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        return sorted(candidates, key=lambda c: (c["score"], c["hall_id"], c["weekday"], c["start"], c["end"]))[0]
+
+    def _materialize_session(self, demand: Demand, chosen: dict[str, Any], sequence: int) -> dict[str, Any]:
+        return {
+            "id": f"sess_{demand.demand_id}_{sequence}",
+            "name": demand.name,
+            "source": demand.source,
+            "group_ids": demand.group_ids,
+            "club_id": chosen["club_id"],
+            "hall_id": chosen["hall_id"],
+            "weekday": chosen["weekday"],
+            "start": chosen["start"],
+            "end": chosen["end"],
+            "manual_exception": False,
+        }
+
+    def _rebuild_sessions_per_group(self, sessions: list[dict[str, Any]]) -> None:
+        self.sessions_per_group = defaultdict(list)
+        for session in sessions:
+            for group_id in session.get("group_ids", []):
+                self.sessions_per_group[group_id].append(session)
+
+    def _demand_from_existing_session(self, session: dict[str, Any]) -> Demand:
+        length = int(session["end"] - session["start"])
+        return Demand(
+            demand_id=f"relocate_{session.get('id', 'unknown')}",
+            name=session.get("name", "Pass"),
+            group_ids=list(session.get("group_ids", [])),
+            club_ids=[session.get("club_id")],
+            min_length=length,
+            max_length=length,
+            preferred_length=length,
+            source=session.get("source", "group"),
+        )
+
+    def _try_place_with_one_relocation(self, demand: Demand, placed: list[dict[str, Any]]) -> bool:
+        self._rebuild_sessions_per_group(placed)
+
+        direct_candidates = self._candidate_slots(demand, placed)
+        if direct_candidates:
+            placed.append(self._materialize_session(demand, self._best_candidate(direct_candidates), len(placed) + 1))
+            self._rebuild_sessions_per_group(placed)
+            return True
+
+        blockers = sorted(list(enumerate(placed)), key=lambda item: (item[1]["weekday"], item[1]["hall_id"], item[1]["start"], item[1]["end"]))
+        for blocker_index, blocker in blockers:
+            placed_without = [s for idx, s in enumerate(placed) if idx != blocker_index]
+            self._rebuild_sessions_per_group(placed_without)
+
+            relocation_demand = self._demand_from_existing_session(blocker)
+            relocation_candidates = self._candidate_slots(relocation_demand, placed_without)
+            if not relocation_candidates:
+                continue
+
+            relocation_candidates = sorted(
+                relocation_candidates,
+                key=lambda c: (c["score"], c["hall_id"], c["weekday"], c["start"], c["end"]),
+            )
+
+            for candidate in relocation_candidates[:8]:
+                # Skippa identisk plats
+                if (
+                    candidate["hall_id"] == blocker["hall_id"]
+                    and int(candidate["weekday"]) == int(blocker["weekday"])
+                    and int(candidate["start"]) == int(blocker["start"])
+                    and int(candidate["end"]) == int(blocker["end"])
+                ):
+                    continue
+
+                relocated = {**blocker, "hall_id": candidate["hall_id"], "weekday": candidate["weekday"], "start": candidate["start"], "end": candidate["end"]}
+                trial_placed = placed_without + [relocated]
+                self._rebuild_sessions_per_group(trial_placed)
+
+                demand_candidates = self._candidate_slots(demand, trial_placed)
+                if not demand_candidates:
+                    continue
+
+                trial_placed.append(self._materialize_session(demand, self._best_candidate(demand_candidates), len(trial_placed) + 1))
+                placed[:] = trial_placed
+                self._rebuild_sessions_per_group(placed)
+                return True
+
+        self._rebuild_sessions_per_group(placed)
+        return False
 
     def _build_demands(self) -> list[Demand]:
         demands: list[Demand] = []
